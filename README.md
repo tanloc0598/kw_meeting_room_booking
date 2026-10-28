@@ -15,6 +15,16 @@ Backend REST API cho hệ thống đặt phòng họp nội bộ (~10 phòng, ~2
 - Docker (Docker Desktop / OrbStack)
 - JDK 21 + Maven
 
+### Tài khoản demo
+
+Seed sẵn bằng Flyway (`V1__create_users.sql`), chỉ dùng để demo/test:
+
+| Email | Mật khẩu | Role |
+| --- | --- | --- |
+| `admin@kw.local` | `Admin@123` | ADMIN |
+| `user1@kw.local` | `User@123` | USER |
+| `user2@kw.local` | `User@123` | USER |
+
 ## Phân tích nghiệp vụ
 
 ### Vấn đề
