@@ -16,9 +16,10 @@ public record BookingResponse(
     BookingStatus status,
     String cancelReason,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    long version
 ) {
   public static BookingResponse from(Booking booking) {
-    return new BookingResponse(booking.getId(), booking.getTitle(), booking.getRoomId(), booking.getUserId(), booking.getStartAt(), booking.getEndAt(), booking.getAttendees(), booking.getStatus(), booking.getCancelReason(), booking.getCreatedAt(), booking.getUpdatedAt());
+    return new BookingResponse(booking.getId(), booking.getTitle(), booking.getRoomId(), booking.getUserId(), booking.getStartAt(), booking.getEndAt(), booking.getAttendees(), booking.getStatus(), booking.getCancelReason(), booking.getCreatedAt(), booking.getUpdatedAt(), booking.getVersion());
   }
 }

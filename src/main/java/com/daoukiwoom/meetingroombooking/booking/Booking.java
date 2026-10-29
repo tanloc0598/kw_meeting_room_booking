@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "bookings")
@@ -52,6 +53,9 @@ public class Booking {
   @UpdateTimestamp
   private Instant updatedAt;
 
+  @Version
+  private long version;
+  
   protected Booking() {
 
   }
@@ -120,5 +124,9 @@ public class Booking {
   public void cancel(String reason) {
     this.status = BookingStatus.CANCELLED;
     this.cancelReason = reason;
+  }
+
+  public long getVersion() {
+    return version;
   }
 }
