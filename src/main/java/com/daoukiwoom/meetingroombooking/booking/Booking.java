@@ -40,7 +40,7 @@ public class Booking {
   private Integer attendees;
 
   @Enumerated(EnumType.STRING)
-  private BookingStatus status;
+  private BookingStatus status = BookingStatus.CONFIRMED;
 
   @Column(length = 500)
   private String cancelReason;
