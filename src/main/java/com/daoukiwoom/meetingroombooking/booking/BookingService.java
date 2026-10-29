@@ -33,17 +33,9 @@ public class BookingService {
 
   @Transactional
   public BookingResponse create(CreateBookingRequest request, Long userId) {
-    Room room = roomRepository.findById(request.roomId())
-        .orElseThrow(() -> new KwException(ErrorCode.ROOM_NOT_FOUND, "Room not found with id: " + request.roomId()));
-
+    Room room = findBookableRoom(request.roomId(), request.attendees());
     Instant now = Instant.now();
 
-    if (!room.isActive()) {
-      throw new KwException(ErrorCode.ROOM_INACTIVE, "Room is inactive: " + room.getId());
-    }
-    if (request.attendees() > room.getCapacity()) {
-      throw new KwException(ErrorCode.BOOKING_EXCEEDS_CAPACITY, "Attendees exceed room capacity");
-    }
     if (request.startAt().isBefore(now)) {
       throw new KwException(ErrorCode.BOOKING_IN_PAST, "Start time must be in the future");
     }
@@ -62,28 +54,44 @@ public class BookingService {
       }
       throw e;
     }
-    return BookingResponse.from(bookingSaved);   // saved: đã có id, createdAt
+    return BookingResponse.from(bookingSaved);
   }
 
-  @Transactional 
+  @Transactional
   public BookingResponse cancel(Long bookingId, Long userId, boolean isAdmin, String cancelReason) {
-    Booking booking = bookingRepository.findById(bookingId)
-        .orElseThrow(() -> new KwException(ErrorCode.BOOKING_NOT_FOUND, "Booking not found with id: " + bookingId));
+    Booking booking = findBooking(bookingId);
+    checkCanModify(booking, userId, isAdmin);
+    booking.cancel(cancelReason);
+    return BookingResponse.from(booking);
+  }
 
-    if (!booking.getUserId().equals(userId)) {
-        if (!isAdmin) {
-            throw new AccessDeniedException("User is not the owner of the booking");
-        }
+  private Booking findBooking(Long id) {
+    return bookingRepository.findById(id)
+        .orElseThrow(() -> new KwException(ErrorCode.BOOKING_NOT_FOUND, "Booking not found with id: " + id));
+  }
+
+  private void checkCanModify(Booking booking, Long userId, boolean isAdmin) {
+    if (!isAdmin && !booking.getUserId().equals(userId)) {
+      throw new AccessDeniedException("User is not the owner of the booking");
     }
     if (booking.getStatus() == BookingStatus.CANCELLED) {
       throw new KwException(ErrorCode.BOOKING_ALREADY_CANCELLED, "Booking is already cancelled");
     }
-    if (booking.getEndAt().isBefore(Instant.now())) {
+    if (!booking.getEndAt().isAfter(Instant.now())) {
       throw new KwException(ErrorCode.BOOKING_ALREADY_ENDED, "Booking has already ended");
     }
+  }
 
-    booking.cancel(cancelReason);
-    return BookingResponse.from(booking);
+  private Room findBookableRoom(Long roomId, int attendees) {
+    Room room = roomRepository.findById(roomId)
+        .orElseThrow(() -> new KwException(ErrorCode.ROOM_NOT_FOUND, "Room not found with id: " + roomId));
+    if (!room.isActive()) {
+      throw new KwException(ErrorCode.ROOM_INACTIVE, "Room is inactive: " + roomId);
+    }
+    if (attendees > room.getCapacity()) {
+      throw new KwException(ErrorCode.BOOKING_EXCEEDS_CAPACITY, "Attendees exceed room capacity");
+    }
+    return room;
   }
 
   private void validateDuration(Instant startAt, Instant endAt) {
