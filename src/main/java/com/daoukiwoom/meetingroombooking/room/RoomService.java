@@ -9,6 +9,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.daoukiwoom.meetingroombooking.booking.BookingRepository;
+import com.daoukiwoom.meetingroombooking.booking.BookingStatus;
 import com.daoukiwoom.meetingroombooking.common.exception.ErrorCode;
 import com.daoukiwoom.meetingroombooking.common.exception.KwException;
 import com.daoukiwoom.meetingroombooking.room.dto.CreateRoomRequest;
@@ -20,9 +22,11 @@ import com.daoukiwoom.meetingroombooking.room.dto.UpdateRoomRequest;
 public class RoomService {
 
     private final RoomRepository roomRepository;
+    private final BookingRepository bookingRepository;
 
-    public RoomService(RoomRepository roomRepository) {
+    public RoomService(RoomRepository roomRepository, BookingRepository bookingRepository) {
         this.roomRepository = roomRepository;
+        this.bookingRepository = bookingRepository;
     }
 
     public List<RoomResponse> findAll(RoomActiveStatus activeStatus, Integer minCapacity, String location,
@@ -62,6 +66,22 @@ public class RoomService {
     public RoomResponse update(Long id, UpdateRoomRequest request) {
         Room room = findRoom(id);
         room.update(request.name(), request.location(), request.capacity());
+        return RoomResponse.from(room);
+    }
+
+    /** BR10: không vô hiệu hoá phòng còn booking CONFIRMED chưa kết thúc (kể cả đang diễn ra). */
+    @Transactional
+    public RoomResponse updateStatus(Long id, boolean active) {
+        Room room = findRoom(id);
+        if (active) {
+            room.activate();
+        } else if (room.isActive()) {
+            if (bookingRepository.existsByRoomIdAndStatusAndEndAtAfter(id, BookingStatus.CONFIRMED, Instant.now())) {
+                throw new KwException(ErrorCode.ROOM_HAS_FUTURE_BOOKINGS,
+                        "Room " + id + " still has upcoming bookings; cancel them first");
+            }
+            room.deactivate();
+        }
         return RoomResponse.from(room);
     }
 

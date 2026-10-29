@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.daoukiwoom.meetingroombooking.room.dto.CreateRoomRequest;
 import com.daoukiwoom.meetingroombooking.room.dto.RoomResponse;
 import com.daoukiwoom.meetingroombooking.room.dto.UpdateRoomRequest;
+import com.daoukiwoom.meetingroombooking.room.dto.UpdateRoomStatusRequest;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
@@ -61,5 +63,11 @@ public class RoomController {
     @PreAuthorize("hasRole('ADMIN')")
     RoomResponse update(@PathVariable Long id, @Valid @RequestBody UpdateRoomRequest request) {
         return roomService.update(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    RoomResponse updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateRoomStatusRequest request) {
+        return roomService.updateStatus(id, request.active());
     }
 }
