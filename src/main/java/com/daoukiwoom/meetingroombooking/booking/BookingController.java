@@ -1,10 +1,33 @@
 package com.daoukiwoom.meetingroombooking.booking;
 
+import java.net.URI;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.daoukiwoom.meetingroombooking.booking.dto.BookingResponse;
+import com.daoukiwoom.meetingroombooking.booking.dto.CreateBookingRequest;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
 public class BookingController {
+  private final BookingService bookingService;
+
+  public BookingController(BookingService bookingService) {
+      this.bookingService = bookingService;
+  }
+
+  @PostMapping
+  public ResponseEntity<BookingResponse> create(@Valid @RequestBody CreateBookingRequest request, Authentication authentication) {
+      Long userId = Long.parseLong(authentication.getName());
+      BookingResponse booking = bookingService.create(request, userId);
+      return ResponseEntity.created(URI.create("/api/v1/bookings/" + booking.id())).body(booking);
+  }
 
 }
