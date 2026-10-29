@@ -6,12 +6,14 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.daoukiwoom.meetingroombooking.booking.dto.BookingResponse;
 import com.daoukiwoom.meetingroombooking.booking.dto.CreateBookingRequest;
+import com.daoukiwoom.meetingroombooking.booking.dto.UpdateBookingRequest;
 import com.daoukiwoom.meetingroombooking.common.exception.ErrorCode;
 import com.daoukiwoom.meetingroombooking.common.exception.KwException;
 import com.daoukiwoom.meetingroombooking.room.Room;
@@ -63,6 +65,43 @@ public class BookingService {
     checkCanModify(booking, userId, isAdmin);
     booking.cancel(cancelReason);
     return BookingResponse.from(booking);
+  }
+
+  @Transactional
+  public BookingResponse update(Long bookingId, UpdateBookingRequest request, Long userId, boolean isAdmin) {
+    Instant now = Instant.now();
+
+    Booking booking = findBooking(bookingId);
+    checkCanModify(booking, userId, isAdmin);
+
+    if (booking.getVersion() != request.version()) {
+      throw new KwException(ErrorCode.BOOKING_VERSION_CONFLICT, "Booking version mismatch");
+    }
+    boolean inProgress = !booking.getStartAt().isAfter(now);
+    if (inProgress) {
+      if (!request.roomId().equals(booking.getRoomId()) || !request.startAt().equals(booking.getStartAt())) {
+          throw new KwException(ErrorCode.BOOKING_IN_PROGRESS, "Booking in progress: only end time can be changed");
+      }
+      if (!request.endAt().isAfter(now)) {
+          throw new KwException(ErrorCode.BOOKING_IN_PAST, "End time must be in the future");
+      }
+    } else if (request.startAt().isBefore(now)) {
+        throw new KwException(ErrorCode.BOOKING_IN_PAST, "Start time must be in the future");
+    }
+
+    Room room = findBookableRoom(request.roomId(), request.attendees());
+    validateDuration(request.startAt(), request.endAt());
+    booking.update(request.title(), room.getId(), request.startAt(), request.endAt(), request.attendees());
+    try {
+      return BookingResponse.from(bookingRepository.saveAndFlush(booking));
+    } catch (DataIntegrityViolationException e) {
+      if (e.getMostSpecificCause().getMessage().contains("bookings_no_overlap")) {
+        throw new KwException(ErrorCode.BOOKING_OVERLAP, "Room is already booked in this time range");
+      }
+      throw e;
+    } catch (ObjectOptimisticLockingFailureException e) {
+      throw new KwException(ErrorCode.BOOKING_VERSION_CONFLICT, "Booking has been modified by another user");
+    }
   }
 
   private Booking findBooking(Long id) {

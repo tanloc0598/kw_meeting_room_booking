@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.daoukiwoom.meetingroombooking.booking.dto.BookingResponse;
 import com.daoukiwoom.meetingroombooking.booking.dto.CancelBookingRequest;
 import com.daoukiwoom.meetingroombooking.booking.dto.CreateBookingRequest;
+import com.daoukiwoom.meetingroombooking.booking.dto.UpdateBookingRequest;
 
 import jakarta.validation.Valid;
 
@@ -42,4 +44,14 @@ public class BookingController {
       BookingResponse booking = bookingService.cancel(id, userId, isAdmin, reason);
       return ResponseEntity.ok(booking);
   }
+
+  @PutMapping("/{id}")
+  public BookingResponse update(@PathVariable Long id,
+                              @Valid @RequestBody UpdateBookingRequest request,
+                              Authentication authentication) {
+    Long userId = Long.parseLong(authentication.getName());
+    boolean isAdmin = authentication.getAuthorities().stream()
+            .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    return bookingService.update(id, request, userId, isAdmin);
+}
 }
