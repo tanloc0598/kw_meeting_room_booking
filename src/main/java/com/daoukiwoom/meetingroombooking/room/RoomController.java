@@ -1,6 +1,7 @@
 package com.daoukiwoom.meetingroombooking.room;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -9,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.daoukiwoom.meetingroombooking.room.dto.CreateRoomRequest;
 import com.daoukiwoom.meetingroombooking.room.dto.RoomResponse;
 import com.daoukiwoom.meetingroombooking.room.dto.UpdateRoomRequest;
+import com.daoukiwoom.meetingroombooking.room.dto.UpdateRoomStatusRequest;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
@@ -36,10 +39,12 @@ public class RoomController {
             @RequestParam(defaultValue = "ACTIVE") RoomActiveStatus status,
             @RequestParam(required = false) Integer minCapacity,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Instant startAt,
+            @RequestParam(required = false) Instant endAt,
             Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        return roomService.findAll(status, minCapacity, location, isAdmin);
+        return roomService.findAll(status, minCapacity, location, startAt, endAt, isAdmin);
     }
 
     @GetMapping("/{id}")
@@ -58,5 +63,11 @@ public class RoomController {
     @PreAuthorize("hasRole('ADMIN')")
     RoomResponse update(@PathVariable Long id, @Valid @RequestBody UpdateRoomRequest request) {
         return roomService.update(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    RoomResponse updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateRoomStatusRequest request) {
+        return roomService.updateStatus(id, request.active());
     }
 }
