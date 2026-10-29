@@ -1,5 +1,6 @@
 package com.daoukiwoom.meetingroombooking.room;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.domain.Sort;
@@ -25,15 +26,17 @@ public class RoomService {
     }
 
     public List<RoomResponse> findAll(RoomActiveStatus activeStatus, Integer minCapacity, String location,
-                                      boolean isAdmin) {
+                                      Instant startAt, Instant endAt, boolean isAdmin) {
         if (activeStatus != RoomActiveStatus.ACTIVE && !isAdmin) {
             throw new AccessDeniedException("Only admin can list inactive rooms");
         }
+        validateTimeRange(activeStatus, startAt, endAt);
 
         Specification<Room> spec = Specification.allOf(
                 RoomSpecs.hasActive(activeStatus.getValue()),
                 RoomSpecs.capacityAtLeast(minCapacity),
-                RoomSpecs.locationContains(location));
+                RoomSpecs.locationContains(location),
+                RoomSpecs.availableBetween(startAt, endAt));
 
         List<Room> rooms = roomRepository.findAll(spec, Sort.by("code"));
         return rooms.stream().map(RoomResponse::from).toList();
@@ -60,6 +63,22 @@ public class RoomService {
         Room room = findRoom(id);
         room.update(request.name(), request.location(), request.capacity());
         return RoomResponse.from(room);
+    }
+
+    /** startAt/endAt đi theo cặp; tìm phòng trống chỉ có nghĩa với phòng đang hoạt động. */
+    private void validateTimeRange(RoomActiveStatus activeStatus, Instant startAt, Instant endAt) {
+        if (startAt == null && endAt == null) {
+            return;
+        }
+        if (startAt == null || endAt == null) {
+            throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "startAt and endAt must be provided together");
+        }
+        if (!endAt.isAfter(startAt)) {
+            throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "endAt must be after startAt");
+        }
+        if (activeStatus != RoomActiveStatus.ACTIVE) {
+            throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "Availability search only applies to active rooms");
+        }
     }
 
     private Room findRoom(Long id) {

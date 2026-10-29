@@ -1,6 +1,7 @@
 package com.daoukiwoom.meetingroombooking.room;
 
 import java.net.URI;
+import java.time.Instant;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -36,10 +37,12 @@ public class RoomController {
             @RequestParam(defaultValue = "ACTIVE") RoomActiveStatus status,
             @RequestParam(required = false) Integer minCapacity,
             @RequestParam(required = false) String location,
+            @RequestParam(required = false) Instant startAt,
+            @RequestParam(required = false) Instant endAt,
             Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
-        return roomService.findAll(status, minCapacity, location, isAdmin);
+        return roomService.findAll(status, minCapacity, location, startAt, endAt, isAdmin);
     }
 
     @GetMapping("/{id}")
