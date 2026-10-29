@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +63,27 @@ public class BookingService {
       throw e;
     }
     return BookingResponse.from(bookingSaved);   // saved: đã có id, createdAt
+  }
+
+  @Transactional 
+  public BookingResponse cancel(Long bookingId, Long userId, boolean isAdmin, String cancelReason) {
+    Booking booking = bookingRepository.findById(bookingId)
+        .orElseThrow(() -> new KwException(ErrorCode.BOOKING_NOT_FOUND, "Booking not found with id: " + bookingId));
+
+    if (!booking.getUserId().equals(userId)) {
+        if (!isAdmin) {
+            throw new AccessDeniedException("User is not the owner of the booking");
+        }
+    }
+    if (booking.getStatus() == BookingStatus.CANCELLED) {
+      throw new KwException(ErrorCode.BOOKING_ALREADY_CANCELLED, "Booking is already cancelled");
+    }
+    if (booking.getEndAt().isBefore(Instant.now())) {
+      throw new KwException(ErrorCode.BOOKING_ALREADY_ENDED, "Booking has already ended");
+    }
+
+    booking.cancel(cancelReason);
+    return BookingResponse.from(booking);
   }
 
   private void validateDuration(Instant startAt, Instant endAt) {
