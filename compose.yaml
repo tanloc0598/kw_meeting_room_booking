@@ -30,7 +30,8 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:8080"
+      # host port configurable; the app always listens on 8080 inside the container
+      - "127.0.0.1:${APP_PORT:-8082}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-meeting_room_booking}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-app}
