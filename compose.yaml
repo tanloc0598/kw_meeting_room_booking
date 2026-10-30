@@ -1,9 +1,44 @@
+x-logging: &logging
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17
+    restart: unless-stopped
+    logging: *logging
     environment:
-      POSTGRES_DB: meeting_room_booking
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
+      POSTGRES_DB: ${DB_NAME:-meeting_room_booking}
+      POSTGRES_USER: ${DB_USER:-app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app}
     ports:
-      - "5432"
+      # random host port on localhost only; Spring Boot docker-compose support reads the mapping
+      - "127.0.0.1::5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-meeting_room_booking}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-app}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      BOOKING_MIN_DURATION: ${BOOKING_MIN_DURATION:-PT5M}
+      BOOKING_DURATION_STEP: ${BOOKING_DURATION_STEP:-PT5M}
+      BOOKING_ZONE: ${BOOKING_ZONE:-Asia/Ho_Chi_Minh}
+
+volumes:
+  pgdata:
