@@ -193,6 +193,12 @@ public class BookingService {
   }
 
   private void validateDuration(Instant startAt, Instant endAt) {
+    // BOOKING_MAX_ADVANCE=P0D disables the limit
+    Duration maxAdvance = bookingProperties.maxAdvance();
+    if (!maxAdvance.isZero() && startAt.isAfter(Instant.now().plus(maxAdvance))) {
+      throw new KwException(ErrorCode.BOOKING_TOO_FAR_AHEAD,
+          "Bookings can be made at most " + maxAdvance.toDays() + " days ahead");
+    }
     Duration duration = Duration.between(startAt, endAt);
     if (duration.compareTo(bookingProperties.minDuration()) < 0) {
       throw new KwException(ErrorCode.BOOKING_INVALID_DURATION, "Booking duration must be at least " + bookingProperties.minDuration().toMinutes() + " minutes");
