@@ -3,6 +3,7 @@ package com.daoukiwoom.meetingroombooking.room;
 import java.time.Instant;
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -58,7 +59,15 @@ public class RoomService {
         }
 
         Room room = new Room(request.name(), request.code(), request.location(), request.capacity());
-        return RoomResponse.from(roomRepository.save(room));
+        try {
+            return RoomResponse.from(roomRepository.saveAndFlush(room));
+        } catch (DataIntegrityViolationException e) {
+            if (e.getMostSpecificCause().getMessage().contains("rooms_code_key")) {
+                throw new KwException(ErrorCode.ROOM_CODE_DUPLICATED,
+                        "Room code '" + request.code() + "' already exists");
+            }
+            throw e;
+        }
     }
 
     /** Không cần save(): entity đang được Hibernate theo dõi, commit sẽ tự UPDATE (dirty checking). */
