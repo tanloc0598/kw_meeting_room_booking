@@ -36,7 +36,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-meeting_room_booking}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-app}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-app}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       BOOKING_MIN_DURATION: ${BOOKING_MIN_DURATION:-PT5M}
       BOOKING_DURATION_STEP: ${BOOKING_DURATION_STEP:-PT5M}
       BOOKING_ZONE: ${BOOKING_ZONE:-Asia/Ho_Chi_Minh}
