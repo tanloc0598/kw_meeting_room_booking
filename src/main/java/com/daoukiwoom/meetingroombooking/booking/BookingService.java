@@ -4,14 +4,26 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.web.PagedModel;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.daoukiwoom.meetingroombooking.booking.dto.BookingResponse;
+import com.daoukiwoom.meetingroombooking.booking.dto.CalendarEventResponse;
 import com.daoukiwoom.meetingroombooking.booking.dto.CreateBookingRequest;
 import com.daoukiwoom.meetingroombooking.booking.dto.UpdateBookingRequest;
 import com.daoukiwoom.meetingroombooking.common.exception.ErrorCode;
@@ -22,6 +34,9 @@ import com.daoukiwoom.meetingroombooking.room.RoomRepository;
 @Service
 @Transactional(readOnly = true)
 public class BookingService {
+  private static final int MAX_PAGE_SIZE = 100;
+  private static final Duration MAX_CALENDAR_RANGE = Duration.ofDays(31);
+
   private final BookingRepository bookingRepository;
   private final RoomRepository roomRepository;
   private final BookingProperties bookingProperties;
@@ -102,6 +117,50 @@ public class BookingService {
     } catch (ObjectOptimisticLockingFailureException e) {
       throw new KwException(ErrorCode.BOOKING_VERSION_CONFLICT, "Booking has been modified by another user");
     }
+  }
+
+  /** UC08: booking của người đang đăng nhập; from mặc định = bây giờ (lịch sắp tới). */
+  public PagedModel<BookingResponse> findMine(Long userId, BookingStatus status, Instant from, Instant to,
+      int page, int size) {
+    Instant effectiveFrom = from == null ? Instant.now() : from;
+    if (to != null && !to.isAfter(effectiveFrom)) {
+      throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "to must be after from");
+    }
+
+    Specification<Booking> spec = Specification.allOf(
+        BookingSpecs.ownedBy(userId),
+        BookingSpecs.hasStatus(status),
+        BookingSpecs.endsAfter(effectiveFrom),
+        BookingSpecs.startsBefore(to));
+
+    Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE), Sort.by("startAt"));
+    Page<BookingResponse> result = bookingRepository.findAll(spec, pageable).map(BookingResponse::from);
+    return new PagedModel<>(result);
+  }
+
+  /** UC04: mọi booking CONFIRMED (của mọi người) chồng lên [from, to), kèm thông tin phòng. */
+  public List<CalendarEventResponse> calendar(Instant from, Instant to, Long roomId, Long viewerId) {
+    if (!to.isAfter(from)) {
+      throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "to must be after from");
+    }
+    if (Duration.between(from, to).compareTo(MAX_CALENDAR_RANGE) > 0) {
+      throw new KwException(ErrorCode.INVALID_SEARCH_PARAMS, "Range must not exceed 31 days");
+    }
+
+    Specification<Booking> spec = Specification.allOf(
+        BookingSpecs.hasStatus(BookingStatus.CONFIRMED),
+        BookingSpecs.endsAfter(from),
+        BookingSpecs.startsBefore(to),
+        BookingSpecs.inRoom(roomId));
+    List<Booking> bookings = bookingRepository.findAll(spec, Sort.by("startAt"));
+
+    Set<Long> roomIds = bookings.stream().map(Booking::getRoomId).collect(Collectors.toSet());
+    Map<Long, Room> rooms = roomRepository.findAllById(roomIds).stream()
+        .collect(Collectors.toMap(Room::getId, Function.identity()));
+
+    return bookings.stream()
+        .map(b -> CalendarEventResponse.from(b, rooms.get(b.getRoomId()), viewerId))
+        .toList();
   }
 
   private Booking findBooking(Long id) {
