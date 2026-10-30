@@ -190,12 +190,12 @@ Mọi lỗi trả về [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc
 | **Tìm phòng trống gộp vào `GET /rooms`** (`startAt` + `endAt`) | Dùng lại bộ lọc sẵn có (`minCapacity`, `location`) và cùng hình dạng response; không cần endpoint riêng |
 | **`GET /bookings` (của tôi) tách khỏi `GET /bookings/calendar` (mọi người)** | Hai nghĩa khác nhau: danh sách cá nhân có phân trang; lịch cần đủ sự kiện trong khoảng giờ nên không phân trang mà giới hạn ≤ 31 ngày |
 | **Danh sách phòng không phân trang** | ~10 phòng, gần như không tăng; FE cần cả danh sách để chọn |
+| **Giảm sức chứa phòng không ảnh hưởng booking đã đặt** | Sức chứa là con số khai báo, thực tế phòng vẫn có thể chứa thêm vài người. Không huỷ hay chặn booking cũ chỉ vì admin sửa con số; BR6 áp dụng cho booking **mới** và khi **sửa** booking (lúc đó phải giảm số người cho vừa sức chứa mới) |
 | **Mã lỗi riêng cho từng quy tắc** (`errorCode`) | Client biết chính xác sai gì mà không phải phân tích message |
 
 ### Giới hạn đã biết (trade-off)
 
 - **Tắt phòng đúng lúc có người đang đặt phòng đó**: có thể lọt một booking vào phòng vừa bị tắt. Khả năng rất thấp (thao tác admin hiếm), hậu quả nhẹ (admin huỷ tay). Chặn hẳn được bằng khoá dòng phòng (`SELECT ... FOR UPDATE`) ở cả hai phía, đổi lại mọi lượt đặt cùng phòng phải xếp hàng.
-- **Giảm sức chứa phòng** không kiểm tra các booking tương lai có số người lớn hơn sức chứa mới.
 - **`CREATE EXTENSION btree_gist`** cần quyền superuser lúc chạy migration (user `app` trong compose có quyền này). Trên DB do DBA quản lý thì cần cài extension trước.
 - Chưa có test tự động; các luồng chính và trường hợp đồng thời đã được thử bằng script gọi API trên bản chạy Docker.
 
@@ -231,6 +231,22 @@ Nhân viên đặt phòng bằng cách nhắn tin cho nhau, không có nơi lưu
 | UC09 | Quản lý phòng: tạo, sửa, vô hiệu hoá | ADMIN |
 
 ### Use case chi tiết
+
+#### UC01 — Đăng nhập
+
+`POST /auth/login` với email + mật khẩu → trả `accessToken` (JWT, hạn 1 giờ), kèm `tokenType` và `expiresIn` (giây). Các API khác gửi token qua header `Authorization: Bearer <token>`. Sai email / mật khẩu → `401` (không nói rõ sai email hay sai mật khẩu, tránh dò tài khoản). Token hết hạn → `401`, đăng nhập lại.
+
+#### UC02 — Xem danh sách / chi tiết phòng
+
+`GET /rooms`: mặc định chỉ phòng **đang hoạt động**, sắp theo mã phòng. Lọc tuỳ chọn, kết hợp được với nhau:
+
+| Tham số | Ý nghĩa |
+| --- | --- |
+| `status` | `ACTIVE` (mặc định), `INACTIVE`, `ALL` — hai giá trị sau chỉ ADMIN dùng được, USER → `403` |
+| `minCapacity` | Sức chứa tối thiểu |
+| `location` | Một phần vị trí, không phân biệt hoa thường (`floor 2` khớp `Floor 2`) |
+
+`GET /rooms/{id}`: chi tiết một phòng, kể cả phòng đã vô hiệu hoá (để xem lại phòng của booking cũ). Không tồn tại → `404`.
 
 #### UC03 — Tìm phòng trống
 
