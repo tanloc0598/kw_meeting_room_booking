@@ -25,6 +25,7 @@ docker compose up -d
 
 - API: `http://localhost:8082/api/v1`
 - Swagger UI: `http://localhost:8082/swagger-ui/index.html`
+- Health check: `http://localhost:8082/actuator/health` → `{"status":"UP"}`. `docker compose ps` hiện `(healthy)` khi app chạy và kết nối được DB
 
 Không cần file `.env`: mọi biến đều có giá trị mặc định. Lần đầu chạy, Flyway tạo bảng và seed dữ liệu demo (3 tài khoản, 6 phòng). Xoá sạch dữ liệu: `docker compose down -v`.
 
@@ -134,7 +135,7 @@ CONSTRAINT bookings_no_overlap
 
 ### API
 
-Mọi endpoint (trừ đăng nhập và Swagger) cần header `Authorization: Bearer <token>`.
+Mọi endpoint (trừ đăng nhập, Swagger và `/actuator/health`) cần header `Authorization: Bearer <token>`.
 
 | Method | Path | Ai | UC | Mô tả |
 | --- | --- | --- | --- | --- |
@@ -192,6 +193,7 @@ Mọi lỗi trả về [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc
 | **Danh sách phòng không phân trang** | ~10 phòng, gần như không tăng; FE cần cả danh sách để chọn |
 | **Giảm sức chứa phòng không ảnh hưởng booking đã đặt** | Sức chứa là con số khai báo, thực tế phòng vẫn có thể chứa thêm vài người. Không huỷ hay chặn booking cũ chỉ vì admin sửa con số; BR6 áp dụng cho booking **mới** và khi **sửa** booking (lúc đó phải giảm số người cho vừa sức chứa mới) |
 | **Mã lỗi riêng cho từng quy tắc** (`errorCode`) | Client biết chính xác sai gì mà không phải phân tích message |
+| **Health check bằng Spring Boot Actuator**, chỉ mở `/actuator/health` | Docker Compose dùng nó để biết app còn sống và còn kết nối DB (DB mất → `503`, container chuyển `unhealthy`). Không trả chi tiết (`show-details=never`) để không lộ thông tin hạ tầng cho người chưa đăng nhập. Chưa làm metrics / Prometheus / Grafana vì quy mô nhỏ (~200 người dùng) |
 
 ### Giới hạn đã biết (trade-off)
 
@@ -336,4 +338,5 @@ Các giới hạn ở BR4 và BR5 cấu hình được qua biến môi trường
 - Check-in và tự giải phóng phòng khi không ai đến
 - Đồng bộ với Google Calendar / Outlook
 - Luồng phê duyệt booking
+- Giám sát đầy đủ: metrics (`/actuator/prometheus`), dashboard Grafana, cảnh báo khi app `DOWN`; giới hạn CORS theo danh sách domain FE khi đã biết domain chính thức
 - ADMIN chỉnh quy tắc đặt phòng (thời lượng tối thiểu, bước, đặt trước tối đa) ngay trên hệ thống: lưu trong DB, có hiệu lực ngay, không cần sửa biến môi trường và khởi động lại như hiện tại

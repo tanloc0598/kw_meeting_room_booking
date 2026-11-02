@@ -38,6 +38,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
         <!-- JWT: xác thực Bearer token bằng Nimbus (HS256), không cần jjwt -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
