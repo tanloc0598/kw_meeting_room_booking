@@ -29,6 +29,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # busybox wget (alpine) exits non-zero on 503 DOWN, e.g. when the DB is unreachable
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     ports:
       # host port configurable; the app always listens on 8080 inside the container
       - "127.0.0.1:${APP_PORT:-8082}:8080"
